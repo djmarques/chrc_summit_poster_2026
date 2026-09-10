@@ -1,0 +1,608 @@
+/* =====================================================================
+ * bra_demo.css — presentation for the BRA companion page.
+ *
+ * The palette and typography deliberately match the printed poster:
+ * Okabe-Ito colorblind-safe accents on a near-white ground, a
+ * Helvetica/Arial stack, and hairline rules instead of heavy borders.
+ * The hex values below are the same ones defined in fig/style.py, so a
+ * change made here should be mirrored there and vice versa.
+ *
+ * Sections, in order:
+ *   1. Design tokens
+ *   2. Base elements and page frame
+ *   3. Masthead
+ *   4. Two-column layout
+ *   5. Conversation column
+ *   6. Evidence column (cards, ledger, plot, capacity meter)
+ *   7. Transport bar (play, restart, scrubber)
+ *   8. Verdict and explorer
+ *   9. Footer
+ * ===================================================================== */
+
+
+/* ---------------------------------------------------------------------
+ * 1. Design tokens
+ *
+ * Every color used anywhere on the page is declared once here. The
+ * short names (--blu, --ora) are kept because they correspond to the
+ * variable names in the figure-generating Python, not because brevity
+ * is a goal.
+ * ------------------------------------------------------------------ */
+:root {
+  --ink:   #1A1A1A;   /* body text and rules that must read as black   */
+  --txt:   #3A434B;   /* secondary text, still fully legible           */
+  --mute:  #8A949C;   /* captions, axis labels, inactive states        */
+  --rule:  #DFE4E8;   /* hairline borders                              */
+  --panel: #F5F6F8;   /* empty track backgrounds                       */
+
+  --blu:   #0072B2;   /* the agent's color: bubbles, progress, slider  */
+  --bluf:  #E8F1F8;   /* the same blue as a fill, for bubble interiors */
+  --ora:   #D55E00;   /* insufficient evidence: low S, unmet capacity  */
+  --oraf:  #FCEFE7;   /* orange as a fill, for the verdict panel       */
+  --grn:   #009E73;   /* sufficient evidence: high S                   */
+  --yel:   #E69F00;   /* the middle band of S, used by the explorer    */
+  --navy:  #2E5F86;   /* the posterior curve and the capacity fill     */
+
+  --maxw: 1180px;     /* content width; the transport bar matches it   */
+}
+
+
+/* ---------------------------------------------------------------------
+ * 2. Base elements and page frame
+ * ------------------------------------------------------------------ */
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;   /* no gray flash on tap */
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--ink);
+  background: #fff;
+  -webkit-font-smoothing: antialiased;
+  /* The bottom padding clears the fixed transport bar so the footer is
+     never hidden underneath it. */
+  padding: 0 0 96px;
+}
+
+.wrap {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 18px;
+}
+
+
+/* ---------------------------------------------------------------------
+ * 3. Masthead
+ * ------------------------------------------------------------------ */
+header {
+  border-bottom: 1px solid var(--rule);
+  padding: 22px 0 16px;
+  margin-bottom: 20px;
+}
+
+h1 {
+  font-size: 22px;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  margin: 0 0 6px;
+}
+
+h1 span {
+  color: var(--blu);   /* the second half of the title, in the agent's color */
+}
+
+.subtitle {
+  font-size: 13.5px;
+  color: var(--txt);
+  margin: 0;
+}
+
+.byline {
+  font-size: 12.5px;
+  color: var(--mute);
+  margin: 8px 0 0;
+}
+
+
+/* ---------------------------------------------------------------------
+ * 4. Two-column layout
+ *
+ * Conversation on the left, computation on the right. Below 860px the
+ * two stack, which puts the conversation first: on a phone the reader
+ * scrolled here from a QR code and wants the story before the math.
+ * ------------------------------------------------------------------ */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 26px;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+.column-heading {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--mute);
+  margin: 0 0 10px;
+}
+
+
+/* ---------------------------------------------------------------------
+ * 5. Conversation column
+ * ------------------------------------------------------------------ */
+#chatColumn {
+  min-height: 120px;   /* reserves space so the page does not jolt on turn 1 */
+}
+
+/* A turn that has not arrived yet is removed from the layout entirely
+   with display:none rather than hidden with opacity. Hiding it with
+   opacity would leave its full height reserved, which pushed the
+   thinking indicator and the computation far down the page. */
+.turn {
+  display: none;
+  margin: 0 0 14px;
+}
+
+.turn.on {
+  display: block;
+  animation: turnIn 0.32s ease both;
+}
+
+@keyframes turnIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.speaker {
+  font-size: 11px;
+  color: var(--mute);
+  margin: 0 0 5px;
+}
+
+.bubble {
+  border: 1px solid var(--rule);
+  border-radius: 11px;
+  padding: 12px 14px;
+  font-size: 15px;
+  background: #fff;
+}
+
+.bubble b {
+  font-weight: 700;
+}
+
+/* The researcher's turns sit to the right, unfilled. */
+.from-researcher .speaker { text-align: right; }
+.from-researcher .bubble  { margin-left: 14%; }
+
+/* The agent's turns sit to the left, filled in its own blue. */
+.from-agent .speaker { color: var(--blu); }
+.from-agent .bubble {
+  border-color: var(--blu);
+  background: var(--bluf);
+  margin-right: 8%;
+}
+
+/* A question back to the researcher is drawn unfilled and dashed, so a
+   request for information reads differently from an assertion. */
+.from-agent.is-question .bubble {
+  background: #fff;
+  border-style: dashed;
+}
+
+/* Thinking indicator: three blinking dots plus a line of text naming
+   what the agent is doing at this moment in the timeline. */
+.thinking {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12.5px;
+  color: var(--blu);
+  margin: 0 0 14px;
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+
+.thinking.on {
+  opacity: 1;
+}
+
+.dots span {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--blu);
+  margin-right: 4px;
+  animation: blink 1.1s infinite;
+}
+
+/* Staggered delays make the three dots read as a wave rather than a flash. */
+.dots span:nth-child(2) { animation-delay: 0.18s; }
+.dots span:nth-child(3) { animation-delay: 0.36s; }
+
+@keyframes blink {
+  0%, 60%, 100% { opacity: 0.25; }
+  30%           { opacity: 1; }
+}
+
+
+/* ---------------------------------------------------------------------
+ * 6. Evidence column
+ * ------------------------------------------------------------------ */
+.card {
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  padding: 14px 15px;
+  margin: 0 0 14px;
+  background: #fff;
+}
+
+.card h3 {
+  font-size: 13.5px;
+  font-weight: 700;
+  margin: 0 0 3px;
+}
+
+.card p.note {
+  font-size: 12px;
+  color: var(--mute);
+  margin: 0 0 11px;
+}
+
+/* --- claim ledger --------------------------------------------------- */
+/* One row per proposition: text on the left, S on the right, and a
+   progress bar spanning both columns underneath. A proposition the
+   agent has not yet extracted is dimmed rather than hidden, so the
+   reader can see how many are coming. */
+.proposition {
+  display: grid;
+  grid-template-columns: 1fr 62px;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 0;
+  border-top: 1px solid var(--rule);
+  opacity: 0.32;
+  transition: opacity 0.3s;
+}
+
+.proposition:first-of-type {
+  border-top: 0;
+}
+
+.proposition.on {
+  opacity: 1;
+}
+
+.proposition-text {
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+/* The provenance line under each proposition ("measurement, directly
+   observed"). Rendered from <em> but set upright, not italic. */
+.proposition-text em {
+  display: block;
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--mute);
+}
+
+.proposition-score {
+  font-size: 17px;
+  font-weight: 700;
+  text-align: right;
+  /* Tabular figures keep the decimal point from shifting as S updates. */
+  font-variant-numeric: tabular-nums;
+}
+
+.score-bar {
+  grid-column: 1 / -1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--panel);
+  overflow: hidden;
+}
+
+/* The filled portion. Its width is set from JavaScript as S x 100%. */
+.score-bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 2px;
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* --- verdict chips -------------------------------------------------- */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 4px;
+}
+
+.chip {
+  font-size: 12px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 5px 11px;
+  color: var(--txt);
+}
+
+.chip b {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- posterior plot ------------------------------------------------- */
+/* overflow:visible lets annotation text extend past the viewBox instead
+   of being clipped mid-word. */
+svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.axis-label {
+  font-size: 10.5px;
+  fill: var(--mute);
+}
+
+.annotation {
+  font-size: 11px;
+  fill: var(--ink);
+}
+
+/* --- capacity meter ------------------------------------------------- */
+/* A single horizontal bar from 0 to 10 nats. The navy fill is the
+   capacity the design supplies; the orange tick is the capacity the
+   claim demands. The claim is supportable only when fill reaches tick. */
+.meter {
+  position: relative;
+  height: 26px;
+  margin: 14px 0 6px;
+}
+
+.meter .track {
+  position: absolute;
+  inset: 9px 0 auto 0;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--panel);
+}
+
+.meter .fill {
+  position: absolute;
+  top: 9px;
+  left: 0;
+  height: 8px;
+  width: 0;
+  border-radius: 4px;
+  background: var(--navy);
+  transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.meter .need {
+  position: absolute;
+  top: 3px;
+  width: 2px;
+  height: 20px;
+  background: var(--ora);
+}
+
+.meter-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--mute);
+  margin-top: 2px;
+}
+
+
+/* ---------------------------------------------------------------------
+ * 7. Transport bar
+ *
+ * Fixed to the bottom of the viewport so the controls stay reachable
+ * however far the reader has scrolled.
+ * ------------------------------------------------------------------ */
+.transport {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.97);
+  border-top: 1px solid var(--rule);
+  backdrop-filter: saturate(1.4) blur(8px);
+  /* The safe-area inset keeps the controls above the home indicator on
+     iPhones; it evaluates to 0 everywhere else. */
+  padding: 11px 0 calc(11px + env(safe-area-inset-bottom));
+}
+
+.transport-inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+button {
+  font: inherit;
+  font-size: 14px;
+  border: 1px solid var(--rule);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--ink);
+  padding: 9px 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;   /* comfortable touch target */
+}
+
+button:hover {
+  border-color: var(--ink);
+}
+
+button.primary {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+
+/* The play/pause icon is an inline SVG inside the button. The global
+   svg rule above would stretch it to the button's width, so it is
+   pinned back to its intrinsic 13 x 14 here. */
+button svg {
+  width: 13px;
+  height: 14px;
+  flex: none;
+}
+
+/* --- scrubber ------------------------------------------------------- */
+/* touch-action:none stops the browser from treating a horizontal drag
+   as a page scroll, which would swallow the seek gesture on a phone. */
+.scrub {
+  flex: 1;
+  position: relative;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.scrub .rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--panel);
+}
+
+/* Elapsed portion of the timeline. */
+.scrub .done {
+  position: absolute;
+  left: 0;
+  height: 4px;
+  width: 0;
+  border-radius: 2px;
+  background: var(--blu);
+  transition: width 0.18s linear;
+}
+
+/* One tick per step, positioned by percentage of total story time. */
+.scrub .stop {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--rule);
+  transform: translateX(-50%);
+}
+
+.scrub .stop.past {
+  border-color: var(--blu);
+  background: var(--blu);
+}
+
+.step {
+  font-size: 12.5px;
+  color: var(--mute);
+  font-variant-numeric: tabular-nums;
+  min-width: 104px;
+  text-align: right;
+}
+
+/* On a narrow phone the step readout is the first thing to go, so the
+   scrubber keeps a usable width. */
+@media (max-width: 620px) {
+  .step { display: none; }
+  .transport-inner { gap: 10px; padding: 0 12px; }
+  button { padding: 9px 12px; }
+}
+
+
+/* ---------------------------------------------------------------------
+ * 8. Verdict and explorer
+ * ------------------------------------------------------------------ */
+.verdict {
+  display: none;
+  border-left: 3px solid var(--ora);
+  border-radius: 0 9px 9px 0;
+  background: var(--oraf);
+  padding: 12px 15px;
+  margin: 4px 0 16px;
+  font-size: 14px;
+}
+
+.verdict.on {
+  display: block;
+  animation: turnIn 0.35s ease both;
+}
+
+.verdict b {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.verdict span {
+  font-size: 13px;
+  color: var(--txt);
+}
+
+/* The explorer card is collapsed rather than removed, so that it can
+   expand smoothly when the walk-through ends. max-height is animated
+   because height:auto cannot be transitioned; 360px is comfortably
+   above the card's real height. */
+#exploreCard {
+  opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: opacity 0.4s, max-height 0.5s;
+}
+
+#exploreCard.on {
+  opacity: 1;
+  max-height: 360px;
+}
+
+input[type="range"] {
+  width: 100%;
+  height: 34px;
+  accent-color: var(--blu);
+}
+
+
+/* ---------------------------------------------------------------------
+ * 9. Footer
+ * ------------------------------------------------------------------ */
+footer {
+  border-top: 1px solid var(--rule);
+  margin-top: 26px;
+  padding: 16px 0 0;
+  font-size: 11.5px;
+  color: var(--mute);
+}
