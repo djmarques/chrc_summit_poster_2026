@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BRA — measuring evidential support, live</title>
+<style>
+/* ------------------------------------------------------------------ *
+ * Palette and type match the printed poster: Okabe-Ito accents on a
+ * near-white ground, Helvetica/Arial stack, hairline rules.
+ * ------------------------------------------------------------------ */
+:root{
+  --ink:#1A1A1A; --txt:#3A434B; --mute:#8A949C; --rule:#DFE4E8;
+  --panel:#F5F6F8; --blu:#0072B2; --bluf:#E8F1F8; --ora:#D55E00;
+  --oraf:#FCEFE7; --grn:#009E73; --yel:#E69F00; --navy:#2E5F86;
+  --maxw:1180px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font-family:"Helvetica Neue",Helvetica,Arial,"Liberation Sans",sans-serif;
+  color:var(--ink); background:#fff; line-height:1.45;
+  font-size:16px; -webkit-font-smoothing:antialiased;
+  padding:0 0 96px;
+}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 18px}
+
+/* ---------------- masthead ---------------- */
+header{border-bottom:1px solid var(--rule);padding:22px 0 16px;margin-bottom:20px}
+h1{font-size:22px;line-height:1.25;margin:0 0 6px;font-weight:700;letter-spacing:-.2px}
+h1 span{color:var(--blu)}
+.sub{font-size:13.5px;color:var(--txt);margin:0}
+.auth{font-size:12.5px;color:var(--mute);margin:8px 0 0}
+
+/* ---------------- layout ---------------- */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:start}
+@media(max-width:860px){.grid{grid-template-columns:1fr;gap:20px}}
+
+.colhead{font-size:11px;letter-spacing:.10em;text-transform:uppercase;
+  color:var(--mute);font-weight:700;margin:0 0 10px}
+
+/* ---------------- chat ---------------- */
+#chat{min-height:330px}
+.turn{margin:0 0 14px;opacity:0;transform:translateY(6px);
+  transition:opacity .32s ease,transform .32s ease}
+.turn.on{opacity:1;transform:none}
+.who{font-size:11px;color:var(--mute);margin:0 0 5px}
+.bub{border:1px solid var(--rule);border-radius:11px;padding:12px 14px;
+  font-size:15px;background:#fff}
+.r .who{text-align:right}
+.r .bub{margin-left:14%}
+.b .bub{border-color:var(--blu);background:var(--bluf);margin-right:8%}
+.b .who{color:var(--blu)}
+.b.ask .bub{background:#fff;border-style:dashed}
+.bub b{font-weight:700}
+
+/* thinking indicator */
+.think{display:flex;align-items:center;gap:9px;font-size:12.5px;
+  color:var(--blu);margin:0 0 14px;opacity:0;transition:opacity .25s}
+.think.on{opacity:1}
+.dots span{display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:var(--blu);margin-right:4px;animation:bl 1.1s infinite}
+.dots span:nth-child(2){animation-delay:.18s}
+.dots span:nth-child(3){animation-delay:.36s}
+@keyframes bl{0%,60%,100%{opacity:.25}30%{opacity:1}}
+
+/* ---------------- evidence panel ---------------- */
+.card{border:1px solid var(--rule);border-radius:12px;padding:14px 15px;
+  margin:0 0 14px;background:#fff}
+.card h3{margin:0 0 3px;font-size:13.5px;font-weight:700}
+.card p.note{margin:0 0 11px;font-size:12px;color:var(--mute)}
+
+/* proposition ledger */
+.prop{display:grid;grid-template-columns:1fr 62px;gap:10px;align-items:center;
+  padding:9px 0;border-top:1px solid var(--rule);opacity:.32;
+  transition:opacity .3s}
+.prop:first-of-type{border-top:0}
+.prop.on{opacity:1}
+.prop .txt{font-size:13px;line-height:1.35}
+.prop .txt em{color:var(--mute);font-style:normal;font-size:11.5px;display:block}
+.prop .s{font-variant-numeric:tabular-nums;font-weight:700;font-size:17px;
+  text-align:right}
+.bar{grid-column:1/-1;height:4px;border-radius:2px;background:var(--panel);
+  overflow:hidden}
+.bar i{display:block;height:100%;width:0;border-radius:2px;
+  transition:width .5s cubic-bezier(.4,0,.2,1)}
+
+/* verdict chips */
+.chips{display:flex;gap:9px;flex-wrap:wrap;margin-top:4px}
+.chip{font-size:12px;border:1px solid var(--rule);border-radius:999px;
+  padding:5px 11px;color:var(--txt)}
+.chip b{font-variant-numeric:tabular-nums}
+
+svg{display:block;width:100%;height:auto;overflow:visible}
+.axlab{font-size:10.5px;fill:var(--mute)}
+.anno{font-size:11px;fill:var(--ink)}
+
+/* capacity meter */
+.meter{position:relative;height:26px;margin:14px 0 6px}
+.meter .track{position:absolute;inset:9px 0 auto 0;height:8px;
+  border-radius:4px;background:var(--panel)}
+.meter .fill{position:absolute;top:9px;left:0;height:8px;border-radius:4px;
+  background:var(--navy);width:0;transition:width .7s cubic-bezier(.4,0,.2,1)}
+.meter .need{position:absolute;top:3px;width:2px;height:20px;background:var(--ora)}
+.mlab{display:flex;justify-content:space-between;font-size:11.5px;
+  color:var(--mute);margin-top:2px}
+
+/* ---------------- transport ---------------- */
+.transport{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.97);
+  border-top:1px solid var(--rule);backdrop-filter:saturate(1.4) blur(8px);
+  padding:11px 0 calc(11px + env(safe-area-inset-bottom))}
+.tin{max-width:var(--maxw);margin:0 auto;padding:0 18px;
+  display:flex;align-items:center;gap:14px}
+button{font:inherit;border:1px solid var(--rule);background:#fff;color:var(--ink);
+  border-radius:9px;padding:9px 15px;cursor:pointer;font-size:14px;
+  display:flex;align-items:center;gap:8px;min-height:42px}
+button:hover{border-color:var(--ink)}
+button.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+.scrub{flex:1;position:relative;height:42px;display:flex;align-items:center;
+  cursor:pointer;touch-action:none}
+.scrub .rail{position:absolute;left:0;right:0;height:4px;border-radius:2px;
+  background:var(--panel)}
+.scrub .done{position:absolute;left:0;height:4px;border-radius:2px;
+  background:var(--blu);width:0;transition:width .18s linear}
+.scrub .stop{position:absolute;width:11px;height:11px;border-radius:50%;
+  background:#fff;border:2px solid var(--rule);transform:translateX(-50%)}
+.scrub .stop.past{border-color:var(--blu);background:var(--blu)}
+.step{font-size:12.5px;color:var(--mute);font-variant-numeric:tabular-nums;
+  min-width:104px;text-align:right}
+@media(max-width:620px){
+  .step{display:none}
+  .tin{gap:10px;padding:0 12px}
+  button{padding:9px 12px}
+}
+
+/* ---------------- explore ---------------- */
+.verdict{border-left:3px solid var(--ora);background:var(--oraf);
+  border-radius:0 9px 9px 0;padding:12px 15px;margin:4px 0 16px;font-size:14px;
+  opacity:0;transform:translateY(6px);transition:opacity .35s,transform .35s}
+.verdict.on{opacity:1;transform:none}
+.verdict b{display:block;margin-bottom:4px}
+.verdict span{color:var(--txt);font-size:13px}
+#explore{opacity:0;max-height:0;overflow:hidden;transition:opacity .4s,max-height .5s}
+#explore.on{opacity:1;max-height:360px}
+input[type=range]{width:100%;accent-color:var(--blu);height:34px}
+footer{border-top:1px solid var(--rule);margin-top:26px;padding:16px 0 0;
+  font-size:11.5px;color:var(--mute)}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<header>
+  <h1>Can I claim that? <span>Measuring evidential support in a conversation.</span></h1>
+  <p class="sub">A live walk-through of the Biomedical Reasoning Agent (BRA): what it computes while it thinks.</p>
+  <p class="auth">Daniel Marques, Duarte Folgado, Nuno Barbosa-Morais &middot; CHRC Annual Summit 2026 &middot; companion to the printed poster</p>
+</header>
+
+<div class="grid">
+  <!-- ============ left: the conversation ============ -->
+  <section>
+    <p class="colhead">The conversation</p>
+    <div id="chat"></div>
+    <div class="verdict" id="verdict">
+      <b>BRA does not endorse the claim.</b>
+      <span>The evidence is stable against the measurement
+      (S&nbsp;=&nbsp;1.00 for what was observed) but not against the claim
+      that was made (S&nbsp;=&nbsp;0.00 for regulation), and a design worth
+      3.0&nbsp;nats cannot carry a mechanism that costs 6.9.</span>
+    </div>
+    <div class="think" id="think"><span class="dots"><span></span><span></span><span></span></span><span id="thinktxt">appraising the evidence</span></div>
+  </section>
+
+  <!-- ============ right: what BRA computes ============ -->
+  <section>
+    <p class="colhead">What BRA computes while it thinks</p>
+
+    <div class="card">
+      <h3>Claim ledger</h3>
+      <p class="note">The answer is broken into single propositions. Each carries its own S.</p>
+      <div id="ledger"></div>
+    </div>
+
+    <div class="card">
+      <h3>Decision stability &nbsp;S</h3>
+      <p class="note" id="snote">S = P(true change &gt; &tau; | data). &tau; is the change this literature treats as evidence of regulation.</p>
+      <svg id="post" viewBox="0 0 460 168" role="img" aria-label="posterior over the true effect"></svg>
+    </div>
+
+    <div class="card">
+      <h3>Epistemic capacity &nbsp;C</h3>
+      <p class="note">C = |ln[(1&minus;&beta;)/&alpha;]| is the largest change in belief this design can justify. It is fixed before any data are collected.</p>
+      <div class="meter">
+        <div class="track"></div><div class="fill" id="cfill"></div>
+        <div class="need" id="cneed" title="evidence the claim requires"></div>
+      </div>
+      <div class="mlab"><span>0</span><span id="clab">C = &mdash;</span><span>10 nats</span></div>
+      <div class="chips" id="cchips"></div>
+    </div>
+
+    <div class="card" id="explore">
+      <h3>Try it yourself</h3>
+      <p class="note">Drag the measured change and watch S move. Everything else is held at the values above.</p>
+      <input type="range" id="slide" min="0" max="30" step="0.5" value="1">
+      <div class="mlab"><span>0%</span><span id="slab">Y fell by 1.0% &nbsp;&rarr;&nbsp; S = 0.00</span><span>30%</span></div>
+    </div>
+  </section>
+</div>
+
+<footer>
+  Numbers are computed in the page from the values shown, using a normal
+  approximation to the posterior over the true change. The printed poster uses
+  the non-central F posterior on the Cohen's <i>f</i> scale. Comprehensive
+  Health Research Centre, NOVA Medical School &middot; Gulbenkian Institute for
+  Molecular Medicine &middot; Fraunhofer Portugal AICOS.
+</footer>
+</div>
+
+<div class="transport">
+  <div class="tin">
+    <button id="play" class="primary" aria-label="play or pause">
+      <svg width="13" height="14" viewBox="0 0 13 14" id="picon"><path d="M1 1l11 6-11 6z" fill="currentColor"/></svg>
+      <span id="ptxt">Play</span>
+    </button>
+    <button id="reset" aria-label="restart">Restart</button>
+    <div class="scrub" id="scrub">
+      <div class="rail"></div><div class="done" id="done"></div>
+    </div>
+    <div class="step" id="stepnum">step 0 of 8</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+ * The scenario. Timings are in milliseconds of "story time"; the scrubber
+ * maps 1:1 onto this timeline, so dragging is exact rather than approximate.
+ * ===================================================================== */
+const SE      = 0.15;    // standard error of the measured % change
+const TAU     = 15.0;    // magnitude the literature treats as regulation
+const ALPHA   = 0.05, POWER = 0.99;          // the design's operating point
+const C_HAVE  = Math.abs(Math.log(POWER/ALPHA));
+const C_NEED  = Math.log(1000);              // odds against a new mechanism
+
+const Q = "I knocked out transcription factor X and measured protein Y in "
+        + "10,000 cells per condition. Y was lower in the knockouts "
+        + "(p &lt; 10<sup>&minus;10</sup>). Can I claim that X regulates Y?";
+
+const PROPS = [
+  {id:"p1", t:"Y is lower in X-knockout cells than in controls.",
+   e:"measurement, directly observed", s:1.00},
+  {id:"p2", t:"The change in Y is large enough to count as regulation.",
+   e:"needs a magnitude and a threshold", s:null},
+  {id:"p3", t:"X regulates Y.",
+   e:"mechanistic conclusion, inherits the weakest link", s:null}
+];
+
+const STEPS = [
+  {at:    0, label:"the question"},
+  {at: 2600, label:"claims extracted"},
+  {at: 5200, label:"BRA asks"},
+  {at: 7600, label:"magnitude given"},
+  {at: 9600, label:"threshold retrieved"},
+  {at:12200, label:"S computed"},
+  {at:15000, label:"C checked"},
+  {at:17600, label:"the answer"},
+  {at:21000, label:"explore"}
+];
+const T_END = 21600;
+
+/* ---- normal tail, Abramowitz & Stegun 7.1.26 for erf ---------------- */
+function erf(x){
+  const s=Math.sign(x); x=Math.abs(x);
+  const a1=.254829592,a2=-.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=.3275911;
+  const t=1/(1+p*x);
+  const y=1-((((a5*t+a4)*t+a3)*t+a2)*t+a1)*t*Math.exp(-x*x);
+  return s*y;
+}
+const Phi = z => 0.5*(1+erf(z/Math.SQRT2));
+const S_of = (obs,tau,se) => 1 - Phi((tau-obs)/se);   // P(true > tau | obs)
+
+/* ===================== DOM builders ================================== */
+const chat = document.getElementById("chat");
+function turn(cls, who, html){
+  const d = document.createElement("div");
+  d.className = "turn " + cls;
+  d.innerHTML = `<p class="who">${who}</p><div class="bub">${html}</div>`;
+  chat.appendChild(d);
+  return d;
+}
+const tQ   = turn("r","Researcher", Q);
+const tAsk = turn("b ask","BRA", "&ldquo;By how much did Y change?&rdquo;");
+const tAns = turn("r","Researcher", "It fell by 1%.");
+const tOut = turn("b","BRA",
+  "&ldquo;In published knockdown studies of X, changes in Y of 15&ndash;20% are "
++ "treated as evidence of regulation. A 1% change falls well below that, and "
++ "with 10,000 cells even a negligible difference reaches significance. "
++ "<b>A change this small does not seem to support the mechanistic claim that "
++ "X regulates Y.</b>&rdquo;");
+
+const ledger = document.getElementById("ledger");
+PROPS.forEach(p=>{
+  const d=document.createElement("div");
+  d.className="prop"; d.id=p.id;
+  d.innerHTML = `<div class="txt">${p.t}<em>${p.e}</em></div>
+                 <div class="s" id="${p.id}s">&mdash;</div>
+                 <div class="bar"><i id="${p.id}b"></i></div>`;
+  ledger.appendChild(d);
+});
+
+/* ===================== the posterior plot ============================ */
+const SVG="http://www.w3.org/2000/svg";
+const post=document.getElementById("post");
+const PW=460, PH=168, PL=8, PR=8, PT=14, PB=26;
+const XMAX=26;                                  // % change axis
+const px = v => PL + (v/XMAX)*(PW-PL-PR);
+function el(n,a){const e=document.createElementNS(SVG,n);
+  for(const k in a) e.setAttribute(k,a[k]); return e;}
+
+function drawPost(obs, tau, reveal){
+  post.innerHTML="";
+  const H=PH-PT-PB, base=PT+H;
+  // axis
+  post.appendChild(el("line",{x1:PL,y1:base,x2:PW-PR,y2:base,
+    stroke:"#DFE4E8","stroke-width":1}));
+  [0,5,10,15,20,25].forEach(v=>{
+    const t=el("text",{x:px(v),y:base+15,"text-anchor":"middle",class:"axlab"});
+    t.textContent=v+"%"; post.appendChild(t);
+  });
+  // the posterior itself, drawn to scale
+  const peak=1/(SE*Math.sqrt(2*Math.PI));
+  const y = v => base - (Math.exp(-0.5*((v-obs)/SE)**2)/(SE*Math.sqrt(2*Math.PI))/peak)*H*0.86;
+  let d="", n=460;
+  for(let i=0;i<=n;i++){const v=XMAX*i/n; d+=(i?"L":"M")+px(v).toFixed(1)+" "+y(v).toFixed(1);}
+  post.appendChild(el("path",{d:d+`L${px(XMAX)} ${base}L${px(0)} ${base}Z`,
+    fill:"#2E5F86","fill-opacity":0.14, stroke:"none"}));
+  post.appendChild(el("path",{d:d,fill:"none",stroke:"#2E5F86","stroke-width":2}));
+  // threshold
+  if(reveal>=1){
+    post.appendChild(el("line",{x1:px(tau),y1:PT-2,x2:px(tau),y2:base,
+      stroke:"#1A1A1A","stroke-width":1.6,"stroke-dasharray":"5 4"}));
+    const t=el("text",{x:px(tau)+7,y:PT+11,class:"anno"});
+    t.textContent="τ = "+tau+"%  (literature)"; post.appendChild(t);
+  }
+  // observed
+  const o=el("text",{x:px(obs)+9,y:PT+H*0.40,class:"anno"});
+  o.textContent="measured "+obs.toFixed(1)+"%"; post.appendChild(o);
+  const o2=el("text",{x:px(obs)+9,y:PT+H*0.40+14,class:"axlab"});
+  o2.textContent="\u00b1"+SE.toFixed(2)+" pp, 10,000 cells per condition";
+  post.appendChild(o2);
+  post.appendChild(el("circle",{cx:px(obs),cy:y(obs),r:3.6,fill:"#2E5F86"}));
+  // the S readout
+  if(reveal>=2){
+    const s=S_of(obs,tau,SE);
+    const g=el("text",{x:PW-PR,y:PT+16,"text-anchor":"end",class:"anno",
+      "font-weight":"700","font-size":"14"});
+    g.textContent="S = "+s.toFixed(2); g.setAttribute("fill", s>=0.8?"#009E73":"#D55E00");
+    post.appendChild(g);
+    const h=el("text",{x:PW-PR,y:PT+32,"text-anchor":"end",class:"axlab"});
+    h.textContent = s>=0.8?"supported":"mass above τ is negligible";
+    post.appendChild(h);
+  }
+}
+
+/* ===================== capacity meter ================================ */
+const cfill=document.getElementById("cfill"), cneed=document.getElementById("cneed"),
+      clab=document.getElementById("clab"), cchips=document.getElementById("cchips");
+cneed.style.left = Math.min(C_NEED/10,1)*100 + "%";
+cneed.style.opacity = 0;
+function drawC(on){
+  cfill.style.width = on ? Math.min(C_HAVE/10,1)*100+"%" : "0%";
+  clab.innerHTML = on ? "C = "+C_HAVE.toFixed(1)+" nats" : "C = &mdash;";
+  cneed.style.opacity = on ? 1 : 0;
+  cchips.innerHTML = on
+    ? `<span class="chip">design gives <b>${C_HAVE.toFixed(1)}</b> nats</span>
+       <span class="chip">a new mechanism needs <b>${C_NEED.toFixed(1)}</b> nats</span>
+       <span class="chip" style="border-color:#D55E00;color:#D55E00">one experiment is not enough</span>`
+    : "";
+}
+
+/* ===================== the timeline =================================== */
+const propOn=(id,on)=>document.getElementById(id).classList.toggle("on",on);
+function setS(id,val,col){
+  const s=document.getElementById(id+"s"), b=document.getElementById(id+"b");
+  if(val===null){s.innerHTML="&mdash;"; s.style.color="var(--mute)"; b.style.width="0"; return;}
+  s.textContent=val.toFixed(2); s.style.color=col; b.style.width=(val*100)+"%";
+  b.style.background=col;
+}
+const think=document.getElementById("think"), thinktxt=document.getElementById("thinktxt");
+
+function render(t){
+  tQ.classList.toggle("on",   t>=  200);
+  tAsk.classList.toggle("on", t>= 5200);
+  tAns.classList.toggle("on", t>= 7600);
+  tOut.classList.toggle("on", t>=17600);
+
+  const thinking = (t>=2600&&t<5200)||(t>=9600&&t<17600);
+  think.classList.toggle("on", thinking);
+  thinktxt.textContent = t<5200 ? "extracting the claims"
+                       : t<12200 ? "retrieving what counts as regulation for X and Y"
+                       : t<15000 ? "computing decision stability"
+                       : "checking what the design can carry";
+
+  propOn("p1", t>=2600); propOn("p2", t>=3200); propOn("p3", t>=3800);
+  setS("p1", t>=2600? 1.00 : null, "#009E73");
+
+  const sVal = S_of(1.0, TAU, SE);
+  setS("p2", t>=12200 ? sVal : null, "#D55E00");
+  setS("p3", t>=12200 ? sVal : null, "#D55E00");
+
+  const reveal = t>=12200 ? 2 : t>=9600 ? 1 : 0;
+  drawPost(t>=7600 ? 1.0 : 1.0, TAU, t>=7600 ? reveal : 0);
+  drawC(t>=15000);
+
+  document.getElementById("verdict").classList.toggle("on", t>=19400);
+  document.getElementById("explore").classList.toggle("on", t>=21000);
+
+  // transport
+  const frac=Math.min(t/T_END,1);
+  document.getElementById("done").style.width=(frac*100)+"%";
+  let k=0; STEPS.forEach((s,i)=>{ if(t>=s.at) k=i; });
+  document.getElementById("stepnum").textContent =
+    "step "+(k+1)+" of "+STEPS.length+" · "+STEPS[k].label;
+  document.querySelectorAll(".scrub .stop").forEach((el,i)=>
+    el.classList.toggle("past", t>=STEPS[i].at));
+}
+
+/* step ticks on the scrubber */
+const scrub=document.getElementById("scrub");
+STEPS.forEach(s=>{
+  const d=document.createElement("div");
+  d.className="stop"; d.style.left=(s.at/T_END*100)+"%";
+  scrub.appendChild(d);
+});
+
+/* ---- clock ---- */
+let t=0, playing=false, last=null;
+function frame(ts){
+  if(!playing) return;
+  if(last===null) last=ts;
+  t=Math.min(t+(ts-last),T_END); last=ts;
+  render(t);
+  if(t>=T_END){ playing=false; setBtn(); return; }
+  requestAnimationFrame(frame);
+}
+function setBtn(){
+  document.getElementById("ptxt").textContent = playing ? "Pause" : (t>=T_END?"Replay":"Play");
+  document.getElementById("picon").innerHTML = playing
+    ? '<rect x="1" y="1" width="4" height="12" fill="currentColor"/><rect x="8" y="1" width="4" height="12" fill="currentColor"/>'
+    : '<path d="M1 1l11 6-11 6z" fill="currentColor"/>';
+}
+function play(){
+  if(t>=T_END) t=0;
+  playing=true; last=null; setBtn(); requestAnimationFrame(frame);
+}
+function pause(){ playing=false; last=null; setBtn(); }
+
+document.getElementById("play").onclick = ()=> playing?pause():play();
+document.getElementById("reset").onclick = ()=>{ t=0; render(0); pause(); };
+
+/* ---- scrubbing ---- */
+function seek(ev){
+  const r=scrub.getBoundingClientRect();
+  const x=(ev.touches?ev.touches[0].clientX:ev.clientX)-r.left;
+  t=Math.max(0,Math.min(1,x/r.width))*T_END;
+  render(t);
+}
+let dragging=false;
+scrub.addEventListener("pointerdown", e=>{dragging=true; pause(); seek(e); scrub.setPointerCapture(e.pointerId);});
+scrub.addEventListener("pointermove", e=>{ if(dragging) seek(e); });
+scrub.addEventListener("pointerup",   e=>{dragging=false;});
+document.addEventListener("keydown", e=>{
+  if(e.code==="Space"){e.preventDefault(); playing?pause():play();}
+  if(e.code==="ArrowRight"){pause(); t=Math.min(T_END,t+1000); render(t);}
+  if(e.code==="ArrowLeft"){ pause(); t=Math.max(0,t-1000); render(t);}
+});
+
+/* ---- the optional explorer ---- */
+const slide=document.getElementById("slide"), slab=document.getElementById("slab");
+slide.addEventListener("input", ()=>{
+  const v=parseFloat(slide.value), s=S_of(v,TAU,SE);
+  slab.innerHTML = "Y fell by "+v.toFixed(1)+"% &nbsp;&rarr;&nbsp; S = "+s.toFixed(2);
+  slab.style.color = s>=0.8 ? "#009E73" : s>=0.5 ? "#E69F00" : "#D55E00";
+  drawPost(v, TAU, 2);
+});
+
+render(0); setBtn();
+setTimeout(play, 700);       // autoplay once the page has settled
+</script>
+</body>
+</html>
