@@ -1,29 +1,24 @@
 <!DOCTYPE html>
 <!--
-  bra_demo.html — interactive companion to the CHRC Annual Summit 2026
+  This is an interactive companion to the CHRC Annual Summit 2026
   poster on the Biomedical Reasoning Agent (BRA).
 
   The page replays a single conversation in which a researcher asks
   whether a result supports a mechanistic claim, and shows the two
-  quantities the agent computes while it answers: decision stability S
-  and epistemic capacity C.
+  quantities the agent computes while it answers, namely the decision 
+  stability S and epistemic capacity C.
 
-  Three files, all in the same folder:
-    bra_demo.html   structure and copy (this file)
-    bra_demo.css    presentation
-    bra_demo.js     the statistical model, the timeline, and the drawing
-
-  This file holds only markup that is fixed. Everything that changes as
-  the timeline advances - the chat turns, the claim ledger, the
-  posterior plot, the capacity meter, the scrubber ticks - is created or
-  updated by bra_demo.js, which finds its targets by the id attributes
-  marked below.
+  Structure:
+    bra_demo.html
+    bra_demo.cs
+    bra_demo.js
 -->
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>BRA — measuring evidential support, live</title>
+  <title>BRA, an agent for measuring evidential support</title>
   <link rel="stylesheet" href="bra_demo.css">
 </head>
 
@@ -33,13 +28,31 @@
 
   <!-- ================= masthead ================= -->
   <header>
+    <!-- Title -->
     <h1>Can I claim that? <span>Measuring evidential support in a conversation.</span></h1>
+
+    <!-- Subtitle -->
     <p class="subtitle">
-      A live walk-through of the Biomedical Reasoning Agent (BRA): what it
-      computes while it thinks.
+      A live walk-through of the Biomedical Reasoning Agent (BRA). What does it
+      compute while it thinks?
+    </p>
+
+    <!-- Authors and affiliations -->
+    <p class="authors">
+      Daniel Marques<sup>2,4</sup>,
+      Andr&eacute; Val&eacute;rio Carreiro<sup>1,3</sup>,
+      Catarina Viegas Dias<sup>1,2,5</sup>,
+      Duarte Folgado<sup>1,3</sup>,
+      Nuno Barbosa-Morais<sup>1,2,4</sup>
+    </p>
+    <p class="affiliations">
+      <sup>1</sup>&nbsp;Comprehensive Health Research Centre, NOVA Medical School, Lisbon &middot;
+      <sup>2</sup>&nbsp;NOVA Medical School, Lisbon &middot;
+      <sup>3</sup>&nbsp;Fraunhofer Portugal AICOS, Porto &middot;
+      <sup>4</sup>&nbsp;Gulbenkian Institute for Molecular Medicine, Lisbon &middot;
+      <sup>5</sup>&nbsp;UCSP Olivais, Lisbon
     </p>
     <p class="byline">
-      Daniel Marques, Duarte Folgado, Nuno Barbosa-Morais &middot;
       CHRC Annual Summit 2026 &middot; companion to the printed poster
     </p>
   </header>
@@ -116,6 +129,30 @@
           <span>10 nats</span>
         </div>
         <div class="chips" id="capacityChips"></div>
+
+        <!-- Design controls, revealed with the explorer at the end of the
+             walk-through. The alpha slider is linear in log10(alpha), so
+             equal travel means equal factors rather than equal differences.
+             Its range, 1e-4 to 0.2, is chosen so that the largest capacity
+             reachable stays inside the meter's 10 nat span. -->
+        <div class="controls" id="capacityControls">
+          <div class="control">
+            <label for="alphaSlider">&alpha;</label>
+            <input type="range" id="alphaSlider" min="-4" max="-0.699" step="0.001" value="-1.301">
+            <output id="alphaReadout">0.05</output>
+          </div>
+          <div class="control">
+            <label for="powerSlider">power</label>
+            <input type="range" id="powerSlider" min="0.50" max="0.99" step="0.01" value="0.99">
+            <output id="powerReadout">99%</output>
+          </div>
+          <p class="note">
+            Move &alpha; across its range and C swings; move power across all of
+            its and C barely shifts. Capacity is necessary but not sufficient:
+            a design large enough to carry the claim still needs a result
+            stable enough to act on, which is what S decides.
+          </p>
+        </div>
       </div>
 
       <!-- Free exploration, revealed once the walk-through has finished. -->
@@ -137,16 +174,15 @@
   </div>
 
   <!-- ================= footer ================= -->
+  <!-- The methods note that used to sit here was removed as clutter. The
+       point it made is already visible where it matters: the plot itself
+       annotates the replicate-level spread and says in so many words that
+       the p-value's precision counts cells rather than replicates. -->
   <footer>
-    Numbers are computed in the page from the values shown, using a normal
-    approximation to the posterior over the true change, with a spread set by
-    variation between biological replicates rather than by the within-experiment
-    standard error. The printed poster uses the non-central F posterior on the
-    Cohen's <i>f</i> scale. Comprehensive
-    Health Research Centre, NOVA Medical School &middot; Gulbenkian Institute for
-    Molecular Medicine &middot; Fraunhofer Portugal AICOS.
-    <br><br>
-    This page was built with Claude Opus 5 (high effort).
+    This interactive guide was built with the assistance of Claude Opus 5 in high effort mode. 
+    Scientific content, statistical definitions and figures were created by the authors, and all 
+    code and text were written and reviewed by humans. Assistance was limited to the
+    implementation of animation and page design. | From Lisbon, with love &#x2665;&#xFE0E;
   </footer>
 
 </div>

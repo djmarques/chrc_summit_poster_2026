@@ -107,6 +107,28 @@ h1 span {
   margin: 0;
 }
 
+/* Author list and affiliations, matching the printed poster. */
+.authors {
+  font-size: 13px;
+  color: var(--ink);
+  margin: 10px 0 0;
+}
+
+.affiliations {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--mute);
+  margin: 3px 0 0;
+}
+
+.authors sup,
+.affiliations sup {
+  font-size: 0.72em;
+  /* Superscripts otherwise stretch the line box and open uneven gaps
+     between the wrapped affiliation lines. */
+  line-height: 0;
+}
+
 .byline {
   font-size: 12.5px;
   color: var(--mute);
@@ -414,6 +436,48 @@ svg {
   font-size: 11.5px;
   color: var(--mute);
   margin-top: 2px;
+}
+
+/* --- design controls ------------------------------------------------ */
+/* The alpha and power sliders under the capacity meter. Collapsed until
+   the walk-through ends, by the same max-height animation the explorer
+   card uses; 260px is comfortably above their real height. */
+.controls {
+  opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: opacity 0.4s, max-height 0.5s;
+}
+
+.controls.on {
+  opacity: 1;
+  max-height: 260px;
+}
+
+/* Fixed label and value columns keep the two slider tracks aligned with
+   each other, and stop the row twitching as the numbers change width. */
+.control {
+  display: grid;
+  grid-template-columns: 62px 1fr 86px;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.control label {
+  font-size: 12.5px;
+  color: var(--txt);
+}
+
+.control output {
+  font-size: 12.5px;
+  color: var(--ink);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.controls .note {
+  margin: 11px 0 0;
 }
 
 

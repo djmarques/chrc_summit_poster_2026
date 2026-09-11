@@ -35,7 +35,7 @@
  *   6. Drawing the capacity meter
  *   7. render(t): the single source of truth
  *   8. Playback: clock, buttons, scrubbing, keyboard
- *   9. The explorer
+ *   9. The explorers
  *  10. Start
  * ===================================================================== */
 "use strict";
@@ -62,18 +62,39 @@ const REPLICATE_SD = 1.55;
  * percentage points. This is the threshold tau in S = P(true > tau). */
 const THRESHOLD = 15.0;
 
-/* The design's operating point, and the capacity it therefore supplies. */
+/* The design the researcher actually ran. These are the starting points
+ * for the sliders under the capacity meter, and the values the page
+ * returns to whenever the walk-through is replayed. */
 const ALPHA = 0.05;
 const POWER = 0.99;
-const CAPACITY_SUPPLIED = Math.abs(Math.log(POWER / ALPHA));
+
+/* Epistemic capacity, in nats: the largest revision of belief that one
+ * decision taken at this operating point can justify. A property of the
+ * design alone, computable before a single measurement exists. */
+function capacity(alpha, power) {
+  return Math.abs(Math.log(power / alpha));
+}
 
 /* What the claim demands: asserting a previously unknown mechanism means
  * overturning prior odds of roughly 1000:1 against, so it costs ln(1000)
- * nats. The claim is supportable only if CAPACITY_SUPPLIED reaches this. */
+ * nats. Supply has to reach this demand before the claim is arguable. */
 const CAPACITY_REQUIRED = Math.log(1000);
+
+/* The value of S at which the poster treats a result as firm enough to
+ * act on. Capacity and stability are separate tests and a claim has to
+ * pass both: enough budget to justify the revision, and a result solid
+ * enough to spend it on. */
+const STABILITY_TO_ACT = 0.80;
 
 /* The magnitude the researcher eventually reports, in percentage points. */
 const OBSERVED_CHANGE = 1.0;
+
+/* Live state, driven by the three sliders once the walk-through ends.
+ * During the scripted portion `render` holds them at the values above,
+ * so a replay always tells the same story. */
+let currentAlpha = ALPHA;
+let currentPower = POWER;
+let currentObserved = OBSERVED_CHANGE;
 
 /* Error function, Abramowitz & Stegun 7.1.26. Accurate to about 1.5e-7,
  * which is far finer than the two decimals the page ever displays.
@@ -205,6 +226,12 @@ const restartButton     = document.getElementById("restartButton");
 const scrubber          = document.getElementById("scrubber");
 const scrubberProgress  = document.getElementById("scrubberProgress");
 const stepReadout       = document.getElementById("stepReadout");
+
+const capacityControls  = document.getElementById("capacityControls");
+const alphaSlider       = document.getElementById("alphaSlider");
+const alphaReadout      = document.getElementById("alphaReadout");
+const powerSlider       = document.getElementById("powerSlider");
+const powerReadout      = document.getElementById("powerReadout");
 
 const exploreCard       = document.getElementById("exploreCard");
 const effectSlider      = document.getElementById("effectSlider");
@@ -526,7 +553,9 @@ function drawPosterior(observed, threshold, reveal) {
 
 /* The meter spans 0 to 10 nats. Both the fill and the marker are placed
  * as a fraction of that span, clamped so a value above 10 pins to the
- * right end rather than overflowing the track. */
+ * right end rather than overflowing the track. The alpha slider's range
+ * is set in the HTML so that the largest reachable C stays under 10 and
+ * the clamp never actually engages. */
 const METER_MAX_NATS = 10;
 
 // The demand marker never moves, so it is positioned once at load.
@@ -534,25 +563,111 @@ capacityNeed.style.left =
   Math.min(CAPACITY_REQUIRED / METER_MAX_NATS, 1) * 100 + "%";
 capacityNeed.style.opacity = 0;
 
-/* Show or hide the capacity comparison. Called with `visible` false for
+/* The joint test, and the whole argument of the page in one function.
+ *
+ * Capacity and stability answer different questions and neither answer
+ * substitutes for the other:
+ *
+ *   supply < demand      No result whatsoever from this design can carry
+ *                        the claim. The reader can fix this by tightening
+ *                        alpha, which is a decision about the design, not
+ *                        about the data.
+ *
+ *   supply >= demand,    The design could carry the claim, but the effect
+ *   S < threshold        that was actually measured is not firm enough to
+ *                        spend that budget on.
+ *
+ *   both met             This study on its own can support the claim.
+ *
+ * Returns the chip text and color for the case in hand. */
+function jointVerdict(supplied, stability) {
+  if (supplied < CAPACITY_REQUIRED) {
+    return { text: "one experiment is not enough", color: "#D55E00" };
+  }
+  if (stability < STABILITY_TO_ACT) {
+    return { text: "capacity is enough, this result is not", color: "#E69F00" };
+  }
+  return { text: "this study alone could support the claim", color: "#009E73" };
+}
+
+/* Show or hide the capacity comparison, computed from whatever operating
+ * point the sliders are currently at. Called with `visible` false for
  * every frame before the agent gets to this step, which is what lets the
  * scrubber run backwards as cleanly as it runs forwards. */
 function drawCapacity(visible) {
+  const supplied = capacity(currentAlpha, currentPower);
+
   capacityFill.style.width = visible
-    ? Math.min(CAPACITY_SUPPLIED / METER_MAX_NATS, 1) * 100 + "%"
+    ? Math.min(supplied / METER_MAX_NATS, 1) * 100 + "%"
     : "0%";
 
+  /* Two decimals, not one. The interesting part of the alpha slider's
+   * range is the neighborhood of the requirement, and at one decimal a
+   * design supplying 6.898 nats and a claim costing 6.908 both print as
+   * 6.9, so the verdict would appear to contradict the numbers beside
+   * it. The alternative, flipping the verdict wherever the rounded
+   * values meet, would quietly loosen the C >= K rule the page is
+   * arguing for. */
   capacityLabel.innerHTML = visible
-    ? "C = " + CAPACITY_SUPPLIED.toFixed(1) + " nats"
+    ? "C = " + supplied.toFixed(2) + " nats"
     : "C = &mdash;";
 
   capacityNeed.style.opacity = visible ? 1 : 0;
 
-  capacityChips.innerHTML = visible
-    ? `<span class="chip">design gives <b>${CAPACITY_SUPPLIED.toFixed(1)}</b> nats</span>
-       <span class="chip">a new mechanism needs <b>${CAPACITY_REQUIRED.toFixed(1)}</b> nats</span>
-       <span class="chip" style="border-color:#D55E00;color:#D55E00">one experiment is not enough</span>`
-    : "";
+  if (!visible) {
+    capacityChips.innerHTML = "";
+    return;
+  }
+
+  /* The verdict reads the effect currently on the plot, so moving either
+   * the design sliders or the effect slider updates it. Note that
+   * changing alpha or power does NOT move S: the stability of a result
+   * already in hand cannot be improved by redescribing the design. */
+  const stability = stabilityScore(currentObserved, THRESHOLD, REPLICATE_SD);
+  const verdict = jointVerdict(supplied, stability);
+
+  capacityChips.innerHTML =
+      `<span class="chip">design gives <b>${supplied.toFixed(2)}</b> nats</span>
+       <span class="chip">a new mechanism needs <b>${CAPACITY_REQUIRED.toFixed(2)}</b> nats</span>
+       <span class="chip" style="border-color:${verdict.color};color:${verdict.color}">${verdict.text}</span>`;
+}
+
+/* Put the three sliders and the values they drive back to the design the
+ * researcher actually ran. Called on every scripted frame, so replaying
+ * or scrubbing backwards always restores the original story. */
+function resetControls() {
+  currentAlpha = ALPHA;
+  currentPower = POWER;
+  currentObserved = OBSERVED_CHANGE;
+
+  alphaSlider.value = Math.log10(ALPHA);
+  powerSlider.value = POWER;
+  effectSlider.value = OBSERVED_CHANGE;
+
+  alphaReadout.textContent = formatAlpha(ALPHA);
+  powerReadout.textContent = Math.round(POWER * 100) + "%";
+  sliderReadout.innerHTML =
+    "Y fell by " + OBSERVED_CHANGE.toFixed(1) + "% &nbsp;&rarr;&nbsp; S = "
+    + stabilityScore(OBSERVED_CHANGE, THRESHOLD, REPLICATE_SD).toFixed(2);
+  sliderReadout.style.color = "";
+}
+
+/* Alpha spans four orders of magnitude, so one fixed number of decimals
+ * cannot serve the whole range: it would print 0.05 as 0.0500 and 0.0001
+ * as 0.000. Use as many decimals as the value needs, and scientific
+ * notation once there are too many to read. */
+const SUPERSCRIPT_DIGITS = ["⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"];
+
+function formatAlpha(alpha) {
+  if (alpha >= 0.01)  return alpha.toFixed(3).replace(/0+$/, "");
+  if (alpha >= 0.001) return alpha.toFixed(4).replace(/0+$/, "");
+
+  const [mantissa, exponent] = alpha.toExponential(1).split("e");
+  const digits = String(Math.abs(Number(exponent)))
+    .split("")
+    .map(d => SUPERSCRIPT_DIGITS[Number(d)])
+    .join("");
+  return mantissa + " × 10⁻" + digits;
 }
 
 
@@ -564,6 +679,12 @@ function drawCapacity(visible) {
  * any `t` in any order gives the same result.
  * ------------------------------------------------------------------ */
 function render(t) {
+
+  /* Everything before the explorer opens is scripted, so the sliders are
+   * held at the design the researcher actually ran. Without this,
+   * replaying after a reader had moved them would narrate the original
+   * conversation over somebody else's numbers. */
+  if (t < TIME.explore) resetControls();
 
   // --- conversation ---
   turnQuestion.classList.toggle("on",  t >= TIME.question);
@@ -617,6 +738,7 @@ function render(t) {
   // --- closing panels ---
   verdictBox.classList.toggle("on", t >= TIME.verdict);
   exploreCard.classList.toggle("on", t >= TIME.explore);
+  capacityControls.classList.toggle("on", t >= TIME.explore);
 
   // --- transport ---
   scrubberProgress.style.width = (Math.min(t / TIME.end, 1) * 100) + "%";
@@ -754,26 +876,57 @@ document.addEventListener("keydown", event => {
 
 
 /* ---------------------------------------------------------------------
- * 9. The explorer
+ * 9. The explorers
  *
- * Once the walk-through is over the reader can move the measured change
- * and watch S respond. Everything else is held fixed, so this isolates
- * the one dependency the poster is arguing about: S is driven by the
- * size of the effect relative to the threshold, not by the p-value.
+ * Once the walk-through is over the reader can move two things
+ * independently, which is the point of separating the two quantities in
+ * the first place:
+ *
+ *   the measured change   moves S, and leaves C untouched. A result is
+ *                         as stable as it is; no amount of redescribing
+ *                         the design makes a small effect firmer.
+ *
+ *   alpha and power       move C, and leave S untouched. A design can be
+ *                         given the budget to justify a new mechanism by
+ *                         demanding a stricter false positive rate, and
+ *                         that decision is taken before any data exist.
+ *
+ * Both feed the same joint verdict chip, so the reader can find the
+ * combination that actually licenses the claim: capacity at or above what
+ * the mechanism costs, AND an effect stable enough to spend it on.
  * ------------------------------------------------------------------ */
+
+/* The measured change. */
 effectSlider.addEventListener("input", () => {
-  const observed = parseFloat(effectSlider.value);
-  const s = stabilityScore(observed, THRESHOLD, REPLICATE_SD);
+  currentObserved = parseFloat(effectSlider.value);
+  const s = stabilityScore(currentObserved, THRESHOLD, REPLICATE_SD);
 
   sliderReadout.innerHTML =
-    "Y fell by " + observed.toFixed(1) + "% &nbsp;&rarr;&nbsp; S = " + s.toFixed(2);
+    "Y fell by " + currentObserved.toFixed(1) + "% &nbsp;&rarr;&nbsp; S = "
+    + s.toFixed(2);
 
   // Same three bands as the poster: act on it, look again, do not act.
   if (s >= 0.8)      sliderReadout.style.color = "#009E73";
   else if (s >= 0.5) sliderReadout.style.color = "#E69F00";
   else               sliderReadout.style.color = "#D55E00";
 
-  drawPosterior(observed, THRESHOLD, 2);
+  drawPosterior(currentObserved, THRESHOLD, 2);
+  drawCapacity(true);            // the verdict depends on S as well as C
+});
+
+/* The false positive rate. The slider position is log10(alpha), so a
+ * given distance dragged is a given factor, not a given difference. */
+alphaSlider.addEventListener("input", () => {
+  currentAlpha = Math.pow(10, parseFloat(alphaSlider.value));
+  alphaReadout.textContent = formatAlpha(currentAlpha);
+  drawCapacity(true);
+});
+
+/* Statistical power. */
+powerSlider.addEventListener("input", () => {
+  currentPower = parseFloat(powerSlider.value);
+  powerReadout.textContent = Math.round(currentPower * 100) + "%";
+  drawCapacity(true);
 });
 
 
