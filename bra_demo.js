@@ -505,14 +505,14 @@ function drawPosterior(observed, threshold, reveal) {
   posteriorPlot.appendChild(spreadLine);
 
   // Names the pseudoreplication point the whole demo turns on.
-  const caveatLine = svgEl("text", {
-    x: labelX, y: labelY + 27, "text-anchor": anchor, class: "axis-label"
-  });
-  caveatLine.textContent =
-    "(the p-value's ±0.15 pp counts cells, not replicates)";
-  posteriorPlot.appendChild(caveatLine);
+  // const caveatLine = svgEl("text", {
+  //  x: labelX, y: labelY + 27, "text-anchor": anchor, class: "axis-label"
+  // });
+  // caveatLine.textContent =
+  //  "(the p-value's ±0.15 pp counts cells, not replicates)";
+  // posteriorPlot.appendChild(caveatLine);
 
-  addBackingPlate([measuredLine, spreadLine, caveatLine], 5);
+  addBackingPlate([measuredLine, spreadLine], 5);
 
   posteriorPlot.appendChild(svgEl("circle", {
     cx: xPixel(observed), cy: yPixel(observed), r: 3.6, fill: "#2E5F86"
